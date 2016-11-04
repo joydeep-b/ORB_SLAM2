@@ -286,7 +286,7 @@ void System::Shutdown()
     // Wait until all thread have effectively stopped
     while(!mpLocalMapper->isFinished() ||
           !mpLoopCloser->isFinished()  ||
-          !(enable_gui && mpViewer->isFinished())      ||
+          (enable_gui && !mpViewer->isFinished())      ||
           mpLoopCloser->isRunningGBA()) {
         usleep(5000);
     }
