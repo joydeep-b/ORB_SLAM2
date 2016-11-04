@@ -158,6 +158,8 @@ private:
     std::mutex mMutexMode;
     bool mbActivateLocalizationMode;
     bool mbDeactivateLocalizationMode;
+
+    const bool enable_gui;
 };
 
 }// namespace ORB_SLAM
