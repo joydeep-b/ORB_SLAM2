@@ -137,6 +137,13 @@ int main(int argc, char **argv)
 
     // Save camera trajectory
     SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
-    SLAM.SaveTrajectoryKITTI(dataset + "/trajectory.txt");
+    const string trajectory_file = dataset + "/trajectory.txt";
+    cout << endl
+         << "Saving camera trajectory to "
+         << trajectory_file
+         << " ..."
+         << endl;
+    const vector<cv::Mat> trajectory = SLAM.GetTrajectoryUMass();
+    cout << endl << "trajectory saved!" << endl;
     return 0;
 }

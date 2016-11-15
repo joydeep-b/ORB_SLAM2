@@ -293,6 +293,75 @@ void System::Shutdown()
     if (enable_gui) pangolin::BindToContext("ORB-SLAM2: Map Viewer");
 }
 
+std::vector<cv::Mat> System::GetTrajectoryUMass()
+{
+    std::vector<cv::Mat> trajectory;
+    vector<KeyFrame*> vpKFs = mpMap->GetAllKeyFrames();
+    sort(vpKFs.begin(),vpKFs.end(),KeyFrame::lId);
+
+    // Transform all keyframes so that the first keyframe is at the origin.
+    // After a loop closure the first keyframe might not be at the origin.
+    cv::Mat Two = vpKFs[0]->GetPoseInverse();
+
+    // Frame pose is stored relative to its reference keyframe (which is
+    // optimized by BA and pose graph).
+    // We need to get first the keyframe pose and then concatenate the relative
+    // transformation.
+    // Frames not localized (tracking failure) are not saved.
+
+    // For each frame we have a reference keyframe (lRit), the timestamp (lT)
+    // and a flag
+    // which is true when tracking failed (lbL).
+    list<ORB_SLAM2::KeyFrame*>::iterator lRit =
+        mpTracker->mlpReferences.begin();
+    list<double>::iterator lT = mpTracker->mlFrameTimes.begin();
+    list<bool>::iterator lbL = mpTracker->mlbLost.begin();
+    for(list<cv::Mat>::iterator lit = mpTracker->mlRelativeFramePoses.begin(),
+        lend=mpTracker->mlRelativeFramePoses.end();
+        lit!=lend; lit++, lRit++, lT++, lbL++) {
+        cv::Mat pose(1, 8, CV_32F);
+        if(*lbL) {
+          *pose.ptr(0) = *lT;
+          for (int i = 1; i < 8; ++i) {
+            *pose.ptr(i) = NAN;
+          }
+          trajectory.push_back(pose);
+          continue;
+        }
+
+        KeyFrame* pKF = *lRit;
+
+        cv::Mat Trw = cv::Mat::eye(4,4,CV_32F);
+
+        // If the reference keyframe was culled, traverse the spanning tree to
+        // get a suitable keyframe.
+        while(pKF->isBad())
+        {
+            Trw = Trw*pKF->mTcp;
+            pKF = pKF->GetParent();
+        }
+
+        Trw = Trw*pKF->GetPose()*Two;
+
+        cv::Mat Tcw = (*lit)*Trw;
+        cv::Mat Rwc = Tcw.rowRange(0,3).colRange(0,3).t();
+        cv::Mat twc = -Rwc*Tcw.rowRange(0,3).col(3);
+
+        vector<float> q = Converter::toQuaternion(Rwc);
+
+        *pose.ptr(0) = *lT;
+        *pose.ptr(1) = twc.at<float>(0);
+        *pose.ptr(2) = twc.at<float>(1);
+        *pose.ptr(3) = twc.at<float>(2);
+        *pose.ptr(4) = q[0];
+        *pose.ptr(5) = q[1];
+        *pose.ptr(6) = q[2];
+        *pose.ptr(7) = q[3];
+        trajectory.push_back(pose);
+    }
+    return trajectory;
+}
+
 void System::SaveTrajectoryTUM(const string &filename)
 {
     cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
